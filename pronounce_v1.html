@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>英語発音記号メーカー</title>
+<script>
+  /* ちらつき防止：描画前にテーマを適用 */
+  try{
+    var _t = localStorage.getItem('pm_theme') ||
+      (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    document.documentElement.setAttribute('data-theme', _t);
+  }catch(e){}
+</script>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --txt:#e6e9ef; --muted:#9aa3b2; --accent:#5b9dff; --accent2:#7c5bff;
+    --star:#ffcf4d; --good:#46d39a; --warn:#ffb454; --danger:#ff6b6b;
+    --chip:#232838; --radius:14px;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f7; --panel:#ffffff; --panel2:#f1f4fa; --line:#d7dce6;
+    --txt:#1b2330; --muted:#5d6878; --accent:#2f6dfd; --accent2:#7a52f5;
+    --star:#e8a900; --good:#13a074; --warn:#b9740f; --danger:#df3b3b;
+    --chip:#e9edf5;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    display:flex; height:100dvh; overflow:hidden; -webkit-text-size-adjust:100%;
+    transition:background .2s ease, color .2s ease;
+  }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar{
+    width:280px; min-width:280px; background:var(--panel); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; height:100%; transition:transform .25s ease;
+  }
+  .side-head{padding:14px 14px 10px; border-bottom:1px solid var(--line)}
+  .brand{font-weight:700; font-size:16px; letter-spacing:.3px; display:flex; align-items:center; gap:8px}
+  .brand small{font-weight:500; color:var(--muted); font-size:11px}
+  .new-btn{
+    margin-top:10px; width:100%; padding:10px; border:none; border-radius:10px; cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-weight:600; font-size:14px;
+  }
+  .side-scroll{flex:1; overflow-y:auto; padding:8px}
+  .side-section{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; padding:10px 8px 4px}
+  .hist-item{
+    position:relative; padding:10px 30px 10px 10px; border-radius:10px; cursor:pointer; margin-bottom:4px;
+    border:1px solid transparent;
+  }
+  .hist-item:hover{background:var(--panel2)}
+  .hist-item.active{background:var(--panel2); border-color:var(--line)}
+  .hist-text{font-size:13px; line-height:1.35; max-height:2.7em; overflow:hidden;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; color:var(--txt)}
+  .hist-meta{font-size:10px; color:var(--muted); margin-top:4px}
+  .hist-star{
+    position:absolute; top:8px; right:6px; background:none; border:none; cursor:pointer;
+    color:#444a58; font-size:16px; padding:2px; line-height:1;
+  }
+  .hist-star.on{color:var(--star)}
+  .empty-note{color:var(--muted); font-size:12px; padding:10px 8px; line-height:1.5}
+  .side-foot{padding:10px; border-top:1px solid var(--line); display:flex; gap:8px}
+  .side-foot button{flex:1; padding:8px; background:var(--panel2); color:var(--muted);
+    border:1px solid var(--line); border-radius:9px; cursor:pointer; font-size:12px}
+
+  /* ---------- Main ---------- */
+  #main{flex:1; display:flex; flex-direction:column; height:100%; min-width:0}
+  .top{display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--line)}
+  #hamburger{display:none; background:none; border:none; color:var(--txt); font-size:22px; cursor:pointer}
+  .top h1{font-size:15px; margin:0; font-weight:600; flex:1}
+  .top .status{font-size:11px; color:var(--muted)}
+  .pill{font-size:11px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted)}
+  .pill.live{color:var(--good); border-color:#244}
+
+  .content{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px}
+  textarea#input{
+    width:100%; min-height:120px; resize:vertical; background:var(--panel2); color:var(--txt);
+    border:1px solid var(--line); border-radius:10px; padding:12px; font-size:15px; line-height:1.5; font-family:inherit;
+  }
+  textarea#input:focus{outline:none; border-color:var(--accent)}
+  .charcount{font-size:12px; color:var(--muted); margin-top:6px; text-align:right}
+  .charcount.warn{color:var(--warn); font-weight:700}
+  .overlimit-note{font-size:12.5px; color:var(--warn); background:rgba(255,180,84,.10);
+    border:1px solid var(--warn); border-radius:9px; padding:9px 11px; margin-top:7px; line-height:1.55}
+  .row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+  .row.between{justify-content:space-between}
+  .gen-btn{
+    padding:11px 22px; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:15px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff;
+  }
+  .gen-btn:disabled{opacity:.5; cursor:default}
+  .ghost{padding:9px 14px; background:var(--panel2); color:var(--txt); border:1px solid var(--line);
+    border-radius:10px; cursor:pointer; font-size:13px}
+  .ghost:hover{border-color:var(--accent)}
+
+  /* speed + voice controls */
+  .ctl-label{font-size:11px; color:var(--muted); margin-right:2px}
+  .speeds{display:flex; gap:6px; flex-wrap:wrap}
+  .spd{padding:6px 11px; background:var(--chip); border:1px solid var(--line); border-radius:999px;
+    cursor:pointer; font-size:13px; color:var(--txt); min-width:46px; text-align:center}
+  .spd.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700}
+  select.voice{background:var(--chip); color:var(--txt); border:1px solid var(--line);
+    border-radius:9px; padding:7px 8px; font-size:13px; max-width:200px}
+  .play-row button{font-size:18px; width:42px; height:42px; border-radius:50%; border:1px solid var(--line);
+    background:var(--panel2); color:var(--txt); cursor:pointer}
+  .play-row button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .play-row button.on{background:var(--good); border-color:var(--good); color:#06281d}
+
+  /* tabs */
+  .tabs{display:flex; gap:4px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  .tab{padding:9px 14px; cursor:pointer; font-size:13px; color:var(--muted); border-bottom:2px solid transparent;
+    margin-bottom:-1px}
+  .tab.on{color:var(--txt); border-bottom-color:var(--accent); font-weight:600}
+  .tab .ai-dot{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent2); margin-left:5px; vertical-align:middle}
+  .tab-body{padding-top:14px; min-height:80px}
+
+  /* word view */
+  .words{display:flex; flex-wrap:wrap; gap:8px}
+  .wcard{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 11px;
+    cursor:pointer; text-align:center; transition:.12s}
+  .wcard:hover{border-color:var(--accent); transform:translateY(-1px)}
+  .wcard .w{font-size:15px; font-weight:600}
+  .wcard .ipa{font-size:14px; color:var(--accent); margin-top:3px; font-family:"Doulos SIL","Charis SIL","Segoe UI",serif}
+  .wcard.unknown .ipa{color:var(--muted)}
+  .wcard.punct{background:none; border:none; cursor:default; padding:8px 2px}
+  .wcard.punct .ipa{display:none}
+
+  .ipa-line{font-size:20px; line-height:1.7; color:var(--accent);
+    font-family:"Doulos SIL","Charis SIL","Segoe UI",serif; word-break:break-word}
+  .chunk{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px}
+  .chunk .ctext{font-size:15px; font-weight:600}
+  .chunk .cipa{font-size:16px; color:var(--accent); margin-top:4px; font-family:"Doulos SIL","Charis SIL",serif}
+  .chunk .cnote{font-size:13px; color:var(--muted); margin-top:5px; line-height:1.5}
+  .chunk .cspeak{float:right; font-size:13px; color:var(--accent); cursor:pointer; border:1px solid var(--line);
+    border-radius:8px; padding:3px 9px; background:none}
+
+  .explain{font-size:14px; line-height:1.75; white-space:pre-wrap}
+  .ai-locked{background:var(--panel2); border:1px dashed var(--line); border-radius:10px; padding:16px; color:var(--muted); font-size:13px; line-height:1.7}
+  .ai-locked b{color:var(--txt)}
+  .ai-locked button{margin-top:10px}
+  .loading{display:inline-flex; align-items:center; gap:8px; color:var(--muted); font-size:13px}
+  .spin{width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--accent); border-radius:50%;
+    animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .badge{font-size:11px; padding:2px 8px; border-radius:999px; background:var(--chip); color:var(--muted); border:1px solid var(--line)}
+  .legend{font-size:11px; color:var(--muted); margin-top:8px; line-height:1.6}
+
+  /* modal */
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:50; padding:16px}
+  .overlay.show{display:flex}
+  .modal{background:var(--panel); border:1px solid var(--line); border-radius:16px; width:100%; max-width:460px; padding:20px}
+  .modal h2{margin:0 0 4px; font-size:17px}
+  .modal p{color:var(--muted); font-size:13px; line-height:1.6; margin:6px 0}
+  .modal label{display:block; font-size:12px; color:var(--muted); margin:12px 0 5px}
+  .modal input,.modal select{width:100%; padding:10px; background:var(--panel2); color:var(--txt);
+    border:1px solid var(--line); border-radius:9px; font-size:14px}
+  .modal .actions{display:flex; gap:8px; margin-top:16px}
+  .modal .actions button{flex:1; padding:11px; border-radius:10px; border:none; cursor:pointer; font-weight:600; font-size:14px}
+  .btn-primary{background:var(--accent); color:#fff}
+  .btn-cancel{background:var(--panel2); color:var(--txt); border:1px solid var(--line)!important}
+  .clearkey-btn{margin-top:8px; padding:7px 12px; background:none; color:var(--danger);
+    border:1px solid var(--danger); border-radius:9px; cursor:pointer; font-size:13px}
+  .clearkey-btn:hover{background:rgba(255,107,107,.12)}
+  .link{color:var(--accent); cursor:pointer; text-decoration:underline}
+  .scrim{position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; z-index:30}
+  .scrim.show{display:block}
+
+  /* mobile */
+  @media (max-width:760px){
+    #sidebar{position:fixed; z-index:40; transform:translateX(-100%); box-shadow:0 0 40px rgba(0,0,0,.5)}
+    #sidebar.open{transform:translateX(0)}
+    #hamburger{display:block}
+    .ipa-line{font-size:18px}
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside id="sidebar">
+  <div class="side-head">
+    <div class="brand">🔤 発音記号メーカー <small>v1</small></div>
+    <button class="new-btn" onclick="newSession()">＋ 新規</button>
+  </div>
+  <div class="side-scroll" id="sideScroll"></div>
+  <div class="side-foot">
+    <button onclick="openSettings()">⚙ 設定</button>
+    <button onclick="showHelp()">？ 使い方</button>
+    <button id="themeBtn" onclick="toggleTheme()">🌙 ダーク</button>
+  </div>
+</aside>
+<div class="scrim" id="scrim" onclick="toggleSidebar(false)"></div>
+
+<!-- Main -->
+<div id="main">
+  <div class="top">
+    <button id="hamburger" onclick="toggleSidebar(true)">☰</button>
+    <h1>英語テキスト → 発音記号・読み上げ・解説</h1>
+    <span class="status" id="usageStatus" style="display:none;cursor:pointer" onclick="confirmResetUsage()" title="クリックでリセット"></span>
+    <span class="pill" id="aiPill">AI:未設定</span>
+    <span class="status" id="dictStatus">辞書:準備中</span>
+  </div>
+
+  <div class="content">
+    <!-- input -->
+    <div class="card">
+      <textarea id="input" placeholder="英文をここに貼り付け（SNSの投稿・映画のスクリプトなど）。例: I could've told you that, but you wouldn't have listened."></textarea>
+      <div class="charcount" id="charCount"><span id="ccNum">0</span> / 300 文字（推奨）・<span id="ccWords">0</span> 語</div>
+      <div class="overlimit-note" id="overNote" style="display:none">⚠ 推奨の300文字を超えています。読み上げが途中で止まったり、AI解説が途切れる場合があります。短く区切るのがおすすめです。</div>
+      <div class="row between" style="margin-top:10px">
+        <div class="row">
+          <button class="gen-btn" id="genBtn" onclick="generate()">発音記号を生成</button>
+          <button class="ghost" onclick="pasteFromClipboard()">📋 貼り付け</button>
+          <button class="ghost" onclick="clearInput()">クリア</button>
+        </div>
+        <span class="badge" id="genHint">単語発音は無料・オフライン対応</span>
+      </div>
+    </div>
+
+    <!-- controls -->
+    <div class="card">
+      <div class="row between">
+        <div class="row">
+          <span class="ctl-label">速度</span>
+          <div class="speeds" id="speeds"></div>
+        </div>
+        <div class="row">
+          <span class="ctl-label">音声</span>
+          <select class="voice" id="voiceSel"></select>
+        </div>
+      </div>
+      <div class="row play-row" style="margin-top:12px; gap:10px; align-items:center">
+        <button class="primary" id="playBtn" title="全文を読み上げ" onclick="playAll()">▶</button>
+        <button id="pauseBtn" title="一時停止/再開" onclick="togglePause()">⏸</button>
+        <button id="stopBtn" title="停止" onclick="stopSpeak()">■</button>
+        <button id="repeatBtn" title="繰り返し再生のオン/オフ" onclick="toggleRepeat()">🔁</button>
+        <span class="status" id="speakStatus">単語をタップ → その単語を発音</span>
+      </div>
+    </div>
+
+    <!-- results -->
+    <div class="card" id="resultCard" style="display:none">
+      <div class="tabs">
+        <div class="tab on" data-tab="word" onclick="switchTab('word')">単語</div>
+        <div class="tab" data-tab="chunk" onclick="switchTab('chunk')">文節<span class="ai-dot"></span></div>
+        <div class="tab" data-tab="sentence" onclick="switchTab('sentence')">文章<span class="ai-dot"></span></div>
+        <div class="tab" data-tab="explain" onclick="switchTab('explain')">解説<span class="ai-dot"></span></div>
+      </div>
+      <div class="tab-body" id="tabBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h2>設定</h2>
+    <p>AI機能（文節・文章のリエゾン/リダクション・意図解説）には Anthropic の API キーが必要です。キーは<b>このブラウザ内だけ</b>に保存され、Anthropic に直接送信されます。</p>
+    <label>Anthropic API キー（sk-ant-… / 空欄なら無料機能のみ）</label>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+    <button type="button" class="clearkey-btn" onclick="clearApiKey()">🗑 このアプリからキーを削除</button>
+    <p style="margin-top:4px;font-size:12px">※ このブラウザに保存したキーを消すだけです。キー自体を完全に無効化するには <span class="link" onclick="window.open('https://console.anthropic.com/settings/keys','_blank')">コンソールでRevoke</span> してください。</p>
+    <label>モデル</label>
+    <select id="modelSel">
+      <option value="claude-haiku-4-5-20251001">Haiku 4.5（安い・速い・推奨）</option>
+      <option value="claude-sonnet-4-6">Sonnet 4.6（高品質）</option>
+      <option value="claude-opus-4-8">Opus 4.8（最高品質・高価）</option>
+    </select>
+    <p style="margin-top:10px">キーは <span class="link" onclick="window.open('https://console.anthropic.com/settings/keys','_blank')">console.anthropic.com</span> で発行。料金は従量制（1回数円程度）。</p>
+    <div class="actions">
+      <button class="btn-cancel" onclick="closeSettings()">キャンセル</button>
+      <button class="btn-primary" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div class="overlay" id="helpOverlay">
+  <div class="modal">
+    <h2>使い方</h2>
+    <p>① 英文を貼り付けて「発音記号を生成」。<br>
+    ② <b>単語</b>タブ＝音節・アクセント確認（無料）。カードをタップで単語を発音。<br>
+    ③ <b>速度</b>と<b>音声</b>を選んで ▶ で全文読み上げ。<br>
+    ④ 履歴は自動で最新10件まで保存。<b>★</b>を付けたものは無制限に長期保存。<br>
+    ⑤ <b>文節 / 文章 / 解説</b>はAI機能。設定でAPIキーを入れると、リエゾン・リダクションを反映した自然な発音や、意図ベースの解説が出ます。</p>
+    <p>※ 単語発音は初回のみ発音辞書をダウンロード（約5MB）。以降はオフラインでも動作します。</p>
+    <div class="actions"><button class="btn-primary" onclick="closeHelp()">閉じる</button></div>
+  </div>
+</div>
+
+<script>
+/* ===================== Constants & State ===================== */
+const DICT_URL = "https://cdn.jsdelivr.net/npm/cmu-pronouncing-dictionary@3.0.0/index.js";
+const SPEEDS = [0.3,0.5,0.7,1.0,1.3,1.5,1.7];
+const LS = {
+  recent:'pm_recent', saved:'pm_saved', key:'pm_apikey', model:'pm_model',
+  speed:'pm_speed', voice:'pm_voice', usage:'pm_usage', repeat:'pm_repeat', theme:'pm_theme'
+};
+// モデル別の従量料金（100万トークンあたりのドル）
+const PRICING = {
+  'claude-haiku-4-5-20251001': {in:1.0, out:5.0},
+  'claude-sonnet-4-6':         {in:3.0, out:15.0},
+  'claude-opus-4-8':           {in:5.0, out:25.0}
+};
+const USD_JPY = 155;   // 円換算の概算レート（表示は「約」）
+const CHAR_LIMIT = 300; // 快適に動く推奨文字数（Aクラス）
+let repeatOn = localStorage.getItem(LS.repeat)==='1';
+let speakToken = 0;    // 読み上げの世代管理（リピート制御用）
+let DICT = null;            // {word: "ARPABET ..."}
+let currentItem = null;     // active history item
+let currentTab = 'word';
+let currentRate = parseFloat(localStorage.getItem(LS.speed)) || 1.0;
+let voices = [];
+
+const ARPA2IPA = {
+  AA:'ɑ',AE:'æ',AH:'ʌ',AO:'ɔ',AW:'aʊ',AY:'aɪ',EH:'ɛ',ER:'ɝ',EY:'eɪ',IH:'ɪ',
+  IY:'i',OW:'oʊ',OY:'ɔɪ',UH:'ʊ',UW:'u',
+  B:'b',CH:'tʃ',D:'d',DH:'ð',F:'f',G:'ɡ',HH:'h',JH:'dʒ',K:'k',L:'l',M:'m',N:'n',
+  NG:'ŋ',P:'p',R:'ɹ',S:'s',SH:'ʃ',T:'t',TH:'θ',V:'v',W:'w',Y:'j',Z:'z',ZH:'ʒ'
+};
+const VOWELS = new Set(['AA','AE','AH','AO','AW','AY','EH','ER','EY','IH','IY','OW','OY','UH','UW']);
+
+/* ===================== IndexedDB (dict cache) ===================== */
+function idb(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open('pm_db',1);
+    r.onupgradeneeded = ()=> r.result.createObjectStore('kv');
+    r.onsuccess = ()=> res(r.result);
+    r.onerror = ()=> rej(r.error);
+  });
+}
+async function idbGet(k){
+  const db = await idb();
+  return new Promise((res)=>{
+    const tx = db.transaction('kv').objectStore('kv').get(k);
+    tx.onsuccess = ()=> res(tx.result); tx.onerror = ()=> res(null);
+  });
+}
+async function idbSet(k,v){
+  const db = await idb();
+  return new Promise((res)=>{
+    const tx = db.transaction('kv','readwrite').objectStore('kv').put(v,k);
+    tx.onsuccess = ()=> res(true); tx.onerror = ()=> res(false);
+  });
+}
+
+/* ===================== Dictionary load ===================== */
+async function loadDict(){
+  setDictStatus('辞書:読込中…');
+  try{
+    let cached = await idbGet('cmudict');
+    if(cached){ DICT = cached; setDictStatus('辞書:準備OK（キャッシュ）'); return; }
+    setDictStatus('辞書:DL中(初回)…');
+    const res = await fetch(DICT_URL);
+    const txt = await res.text();
+    const eq = txt.indexOf('=', txt.indexOf('dictionary'));   // skip JSDoc comment braces
+    const s = txt.indexOf('{', eq); const e = txt.lastIndexOf('}');
+    let json = txt.slice(s, e+1).replace(/,(\s*})\s*$/,'$1');
+    DICT = JSON.parse(json);
+    await idbSet('cmudict', DICT);
+    setDictStatus('辞書:準備OK');
+  }catch(err){
+    console.error(err);
+    DICT = {};
+    setDictStatus('辞書:オフライン(未取得)');
+  }
+}
+function setDictStatus(t){ document.getElementById('dictStatus').textContent = t; }
+
+/* ===================== ARPABET → IPA ===================== */
+function arpaToIPA(arpa){
+  const phones = arpa.trim().split(/\s+/);
+  const items = phones.map(p=>{
+    const m = p.match(/^([A-Z]+)(\d?)$/); if(!m) return {ipa:'',isVowel:false,stress:''};
+    let base=m[1], stress=m[2], ipa=ARPA2IPA[base]||'';
+    if(base==='AH' && stress==='0') ipa='ə';
+    if(base==='ER' && stress==='0') ipa='ɚ';
+    return {ipa, isVowel:VOWELS.has(base), stress};
+  });
+  const marks = new Array(items.length).fill('');
+  for(let i=0;i<items.length;i++){
+    if(items[i].isVowel && (items[i].stress==='1'||items[i].stress==='2')){
+      let j=i; while(j-1>=0 && !items[j-1].isVowel) j--;   // back to onset start
+      marks[j] = items[i].stress==='1' ? 'ˈ' : 'ˌ';
+    }
+  }
+  let out=''; for(let i=0;i<items.length;i++) out += marks[i]+items[i].ipa;
+  return out;
+}
+function lookupIPA(raw){
+  if(!DICT) return null;
+  let w = raw.toLowerCase().replace(/[^a-z']/g,'');
+  if(!w) return null;
+  let a = DICT[w];
+  if(!a && w.endsWith("'s")) a = DICT[w.slice(0,-2)];
+  if(!a && w.endsWith("s")) a = DICT[w.slice(0,-1)];   // rough plural fallback
+  if(!a) return null;
+  return arpaToIPA(a);
+}
+
+/* ===================== Tokenize ===================== */
+function tokenize(text){
+  // returns array of {raw, isWord}
+  const out=[]; const re=/[A-Za-z]+(?:'[A-Za-z]+)?|[^A-Za-z\s]+|\s+/g; let m;
+  while((m=re.exec(text))!==null){
+    const t=m[0];
+    if(/^\s+$/.test(t)) continue;
+    out.push({raw:t, isWord:/[A-Za-z]/.test(t)});
+  }
+  return out;
+}
+function splitChunks(text){
+  // offline naive chunking: split on punctuation & common boundary words
+  let parts = text.split(/([,;:.!?]+)/).map(s=>s.trim()).filter(Boolean);
+  // merge punctuation back
+  let chunks=[], buf='';
+  parts.forEach(p=>{
+    if(/^[,;:.!?]+$/.test(p)){ chunks.push((buf+' '+p).trim()); buf=''; }
+    else { if(buf) chunks.push(buf); buf=p; }
+  });
+  if(buf) chunks.push(buf);
+  return chunks.length?chunks:[text.trim()];
+}
+function sentenceIPA(text){
+  return tokenize(text).map(t=>{
+    if(!t.isWord) return t.raw;
+    const ipa = lookupIPA(t.raw);
+    return ipa ? '/'+ipa+'/' : t.raw;
+  }).join(' ');
+}
+
+/* ===================== Generate ===================== */
+async function generate(){
+  const text = document.getElementById('input').value.trim();
+  if(!text){ document.getElementById('input').focus(); return; }
+  if(text.length > CHAR_LIMIT){
+    const ok = confirm(`入力が ${text.length} 文字あります（推奨は ${CHAR_LIMIT} 文字まで）。\n\nこのまま続けると、読み上げが途中で止まったり、AI解説が途切れる場合があります。\n短く区切るのがおすすめです。\n\nこのまま生成しますか？`);
+    if(!ok) return;
+  }
+  if(!DICT){ await loadDict(); }
+
+  const item = {
+    id: Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    text, createdAt: Date.now(), starred:false,
+    ai:null   // filled by AI: {chunks:[{text,ipa,note}], sentenceIpa, sentenceNotes, explanation}
+  };
+  currentItem = item;
+  pushRecent(item);
+  renderResult();
+  switchTab('word');
+  document.getElementById('resultCard').style.display='block';
+  // AIは自動実行しない（課金は手動ボタンを押したときだけ）
+}
+
+// 手動でAI生成を呼ぶ
+function requestAI(){
+  if(!currentItem) return;
+  if(!getKey()){ openSettings(); return; }
+  runAI(currentItem);
+}
+
+/* ===================== Render results ===================== */
+function renderResult(){
+  if(!currentItem) return;
+  renderTab();
+}
+function switchTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t=> t.classList.toggle('on', t.dataset.tab===tab));
+  renderTab();
+}
+function renderTab(){
+  const body = document.getElementById('tabBody');
+  const it = currentItem; if(!it){ body.innerHTML=''; return; }
+  if(currentTab==='word'){ body.innerHTML = renderWords(it.text); return; }
+  if(currentTab==='chunk'){ body.innerHTML = renderChunks(it); return; }
+  if(currentTab==='sentence'){ body.innerHTML = renderSentence(it); return; }
+  if(currentTab==='explain'){ body.innerHTML = renderExplain(it); return; }
+}
+function renderWords(text){
+  const toks = tokenize(text);
+  let html = '<div class="words">';
+  let unknown=0, total=0;
+  toks.forEach(t=>{
+    if(!t.isWord){ html += `<div class="wcard punct"><div class="w">${esc(t.raw)}</div></div>`; return; }
+    total++;
+    const ipa = lookupIPA(t.raw);
+    if(!ipa) unknown++;
+    html += `<div class="wcard ${ipa?'':'unknown'}" onclick="speak(${esc(jsq(t.raw))})">
+      <div class="w">${esc(t.raw)}</div>
+      <div class="ipa">${ipa?('/'+ipa+'/'):'—'}</div></div>`;
+  });
+  html += '</div>';
+  html += `<div class="legend">ˈ=第1アクセント　ˌ=第2アクセント　/ /内が発音記号（米語・CMU辞書）。タップでその単語を発音。${unknown?` 辞書未収録: ${unknown}/${total}語`:''}</div>`;
+  return html;
+}
+function renderChunks(it){
+  if(it.ai && it.ai.chunks){
+    let h='';
+    it.ai.chunks.forEach(c=>{
+      h += `<div class="chunk"><button class="cspeak" onclick="speak(${esc(jsq(c.text))})">▶ 発音</button>
+        <div class="ctext">${esc(c.text)}</div>
+        <div class="cipa">/${esc(c.ipa)}/</div>
+        ${c.note?`<div class="cnote">${esc(c.note)}</div>`:''}</div>`;
+    });
+    return h + `<div class="legend">AI生成：意味のかたまり（チャンク）ごとの自然な発音。</div>`;
+  }
+  if(it.aiLoading) return `<div class="loading"><span class="spin"></span>AIでチャンク解析中…</div>`;
+  // offline best-effort
+  const chunks = splitChunks(it.text);
+  let h = `<div class="legend" style="margin:0 0 10px">下は<b>簡易チャンク</b>（句読点ベース・無料）。AI生成で、文法に基づく自然なチャンク分け＋ポイント解説になります。</div>`;
+  chunks.forEach(c=>{
+    h += `<div class="chunk"><button class="cspeak" onclick="speak(${esc(jsq(c))})">▶ 発音</button>
+      <div class="ctext">${esc(c)}</div>
+      <div class="cipa">${esc(sentenceIPA(c))}</div></div>`;
+  });
+  return h + (getKey() ? aiButton() : lockBox('自然なチャンク分け＋解説'));
+}
+function renderSentence(it){
+  if(it.ai && it.ai.sentenceIpa){
+    return `<div class="ipa-line">/${esc(it.ai.sentenceIpa)}/</div>
+      ${it.ai.sentenceNotes?`<div class="cnote" style="margin-top:12px;color:var(--muted);line-height:1.7">${esc(it.ai.sentenceNotes)}</div>`:''}
+      <div class="legend">AI生成：実際の連結（リエゾン）・脱落（リダクション）を反映した自然な発音。</div>`;
+  }
+  if(it.aiLoading) return `<div class="loading"><span class="spin"></span>AIで自然発話を生成中…</div>`;
+  return `<div class="ipa-line">${esc(sentenceIPA(it.text))}</div>
+    <div class="legend">これは単語をつないだ<b>逐語の発音</b>（無料）。リエゾン・リダクションを反映した<b>自然な発音</b>はAI生成で表示されます。</div>
+    ${getKey() ? aiButton() : lockBox('文章単位の自然な発音')}`;
+}
+function renderExplain(it){
+  if(it.ai && it.ai.explanation){
+    return `<div class="explain">${esc(it.ai.explanation)}</div>`;
+  }
+  if(it.aiLoading) return `<div class="loading"><span class="spin"></span>AIで解説を生成中…</div>`;
+  if(getKey()) return `<div class="legend" style="margin-bottom:10px">直訳ではなく、話し手の意図・含意・表現のポイントをAIが解説します。</div>${aiButton()}`;
+  return lockBox('意図・ニュアンスの解説');
+}
+// 手動AI生成ボタン（文節・文章・解説タブで共通。3つまとめて1回の生成）
+function aiButton(){
+  return `<div class="ai-locked" style="border-style:solid">🤖 <b>AIで詳しく生成</b>（文節・文章・解説をまとめて取得）<br>
+    1回あたり約1〜3円が課金されます。<br>
+    <button class="gen-btn" style="margin-top:10px;padding:9px 18px;font-size:14px" onclick="requestAI()">AIで生成する</button></div>`;
+}
+function lockBox(what){
+  return `<div class="ai-locked">🔒 <b>${what}</b> はAI機能です。<br>
+    設定でAnthropicのAPIキーを入れると有効になります（料金は従量制・1回数円程度、キーはブラウザ内のみ保存）。
+    <br><button class="ghost" onclick="openSettings()">⚙ APIキーを設定する</button></div>`;
+}
+
+/* ===================== AI (Claude API) ===================== */
+function getKey(){ return localStorage.getItem(LS.key)||''; }
+function getModel(){ return localStorage.getItem(LS.model)||'claude-haiku-4-5-20251001'; }
+
+/* ===================== Usage / 課金カウント ===================== */
+function getUsage(){
+  try{ return JSON.parse(localStorage.getItem(LS.usage)) || {calls:0,inTok:0,outTok:0,costUSD:0}; }
+  catch(e){ return {calls:0,inTok:0,outTok:0,costUSD:0}; }
+}
+function recordUsage(usage, model){
+  if(!usage) return;
+  const p = PRICING[model] || PRICING['claude-haiku-4-5-20251001'];
+  const inTok  = (usage.input_tokens||0) + (usage.cache_creation_input_tokens||0) + (usage.cache_read_input_tokens||0);
+  const outTok = usage.output_tokens||0;
+  const cost = inTok/1e6*p.in + outTok/1e6*p.out;
+  const u = getUsage();
+  u.calls += 1; u.inTok += inTok; u.outTok += outTok; u.costUSD += cost;
+  localStorage.setItem(LS.usage, JSON.stringify(u));
+  updateUsageStatus();
+}
+function resetUsage(){
+  localStorage.setItem(LS.usage, JSON.stringify({calls:0,inTok:0,outTok:0,costUSD:0}));
+  updateUsageStatus();
+}
+function updateUsageStatus(){
+  const el = document.getElementById('usageStatus');
+  if(!el) return;
+  if(!getKey()){ el.textContent=''; el.style.display='none'; return; }
+  const u = getUsage();
+  const yen = u.costUSD * USD_JPY;
+  el.style.display='';
+  el.textContent = `💰 ${u.calls}回 / 約${yen<1?yen.toFixed(2):Math.round(yen)}円（$${u.costUSD.toFixed(4)}）`;
+  el.title = `累計 入力 ${u.inTok.toLocaleString()} / 出力 ${u.outTok.toLocaleString()} トークン。クリックでリセット`;
+}
+
+async function runAI(item){
+  item.aiLoading = true;
+  if(currentItem && currentItem.id===item.id && currentTab!=='word') renderTab(); // show spinner
+  const sys ="You are an expert English phonetician and language coach for Japanese learners. Output ONLY valid minified JSON, no markdown.";
+  const prompt = `Analyze this English text for a Japanese learner:\n"""${item.text}"""\n\nReturn JSON with EXACTLY these keys:\n{\n"chunks":[{"text":"<sense group as written>","ipa":"<IPA of the chunk, American English, with stress marks>","note":"<日本語で、このチャンクの役割・意味・発音の注意点>"}],\n"sentenceIpa":"<IPA of the WHOLE text as naturally connected speech, showing liaison/linking and reduction (weak forms, elision, flapping), American English, with stress and ‖ for pauses>",\n"sentenceNotes":"<日本語で、起きているリエゾン/リダクションの具体例を2〜4点>",\n"explanation":"<日本語で、直訳ではなく『話し手の意図・含意・言外のニュアンス・表現上のポイント』を3〜6行で>"\n}\nUse proper IPA symbols. Keep Japanese concise.`;
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'x-api-key':getKey(),
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({
+        model:getModel(), max_tokens:1500,
+        system:sys,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    if(!res.ok){ const t=await res.text(); throw new Error('API '+res.status+': '+t.slice(0,200)); }
+    const data = await res.json();
+    recordUsage(data.usage, getModel());   // 実際のトークン消費から課金を加算
+    let txt = (data.content&&data.content[0]&&data.content[0].text)||'';
+    const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
+    const parsed = JSON.parse(txt.slice(s,e+1));
+    item.ai = parsed;
+    item.aiLoading = false;
+    if(currentItem && currentItem.id===item.id) renderTab();
+    persistItem(item);
+    renderSidebar();
+  }catch(err){
+    console.error(err);
+    item.aiLoading = false;
+    if(currentItem && currentItem.id===item.id){
+      const body=document.getElementById('tabBody');
+      if(['chunk','sentence','explain'].includes(currentTab))
+        body.innerHTML = `<div class="ai-locked">⚠ AI生成に失敗しました。<br>${esc(err.message)}<br><button class="ghost" onclick="requestAI()">再試行</button>　<button class="ghost" onclick="openSettings()">設定を確認</button></div>`;
+    }
+  }
+}
+
+/* ===================== Speech (Web Speech API) ===================== */
+function loadVoices(){
+  voices = speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang));
+  const sel = document.getElementById('voiceSel');
+  const saved = localStorage.getItem(LS.voice);
+  sel.innerHTML = voices.map(v=>`<option value="${v.name}">${v.name} (${v.lang})</option>`).join('')
+    || '<option>英語音声が見つかりません</option>';
+  if(saved && voices.some(v=>v.name===saved)) sel.value=saved;
+  else { const us=voices.find(v=>/en[-_]US/i.test(v.lang)); if(us) sel.value=us.name; }
+}
+function currentVoice(){
+  const name=document.getElementById('voiceSel').value;
+  return voices.find(v=>v.name===name)||null;
+}
+function speak(text){
+  if(!text) return;
+  speechSynthesis.cancel();
+  const myToken = ++speakToken;
+  const u=new SpeechSynthesisUtterance(text);
+  const v=currentVoice(); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='en-US';
+  u.rate=currentRate;
+  document.getElementById('speakStatus').textContent='🔊 '+text.slice(0,40);
+  u.onend=()=>{
+    document.getElementById('speakStatus').textContent= repeatOn ? '🔁 リピート中…' : '単語をタップ → その単語を発音';
+    if(repeatOn && myToken===speakToken){
+      setTimeout(()=>{ if(repeatOn && myToken===speakToken) speak(text); }, 400);
+    }
+  };
+  speechSynthesis.speak(u);
+}
+function toggleRepeat(){
+  repeatOn = !repeatOn;
+  localStorage.setItem(LS.repeat, repeatOn?'1':'0');
+  const b=document.getElementById('repeatBtn');
+  b.classList.toggle('on', repeatOn);
+  document.getElementById('speakStatus').textContent = repeatOn ? '🔁 リピートON（▶で連続再生）' : '単語をタップ → その単語を発音';
+}
+function playAll(){
+  const text = currentItem ? currentItem.text : document.getElementById('input').value;
+  speak(text);
+}
+function togglePause(){
+  if(speechSynthesis.paused) speechSynthesis.resume();
+  else if(speechSynthesis.speaking) speechSynthesis.pause();
+}
+function stopSpeak(){ speakToken++; speechSynthesis.cancel(); document.getElementById('speakStatus').textContent='停止'; }
+
+/* ===================== Speed UI ===================== */
+function renderSpeeds(){
+  const el=document.getElementById('speeds');
+  el.innerHTML = SPEEDS.map(s=>`<div class="spd ${s===currentRate?'on':''}" onclick="setSpeed(${s})">${s.toFixed(1)}×</div>`).join('');
+}
+function setSpeed(s){ currentRate=s; localStorage.setItem(LS.speed,s); renderSpeeds(); }
+
+/* ===================== History ===================== */
+function getRecent(){ try{return JSON.parse(localStorage.getItem(LS.recent))||[]}catch(e){return[]} }
+function getSaved(){ try{return JSON.parse(localStorage.getItem(LS.saved))||[]}catch(e){return[]} }
+function setRecent(a){ localStorage.setItem(LS.recent, JSON.stringify(a)); }
+function setSaved(a){ localStorage.setItem(LS.saved, JSON.stringify(a)); }
+
+function pushRecent(item){
+  let r=getRecent().filter(x=>x.id!==item.id);
+  r.unshift(item);
+  if(r.length>10) r=r.slice(0,10);   // ring buffer: 11th overwrites oldest
+  setRecent(r);
+  renderSidebar();
+}
+function persistItem(item){
+  // update in whichever list it lives
+  let r=getRecent(); let i=r.findIndex(x=>x.id===item.id); if(i>=0){ r[i]=item; setRecent(r); }
+  let s=getSaved(); let j=s.findIndex(x=>x.id===item.id); if(j>=0){ s[j]=item; setSaved(s); }
+}
+function toggleStar(id, ev){
+  if(ev) ev.stopPropagation();
+  let r=getRecent(), s=getSaved();
+  let item = r.find(x=>x.id===id) || s.find(x=>x.id===id);
+  if(!item) return;
+  const idx=s.findIndex(x=>x.id===id);
+  if(idx>=0){ s.splice(idx,1); item.starred=false; }
+  else { item.starred=true; s.unshift({...item}); }
+  // reflect star flag in recent copy
+  let ri=r.findIndex(x=>x.id===id); if(ri>=0) r[ri].starred=item.starred;
+  setSaved(s); setRecent(r);
+  if(currentItem && currentItem.id===id) currentItem.starred=item.starred;
+  renderSidebar();
+}
+function loadItem(id){
+  let item = getSaved().find(x=>x.id===id) || getRecent().find(x=>x.id===id);
+  if(!item) return;
+  currentItem=item;
+  document.getElementById('input').value=item.text;
+  updateCharCount();
+  document.getElementById('resultCard').style.display='block';
+  switchTab('word');
+  renderSidebar();
+  toggleSidebar(false);
+}
+function deleteItem(id, ev){
+  if(ev) ev.stopPropagation();
+  setRecent(getRecent().filter(x=>x.id!==id));
+  setSaved(getSaved().filter(x=>x.id!==id));
+  renderSidebar();
+}
+function renderSidebar(){
+  const saved=getSaved(), recent=getRecent();
+  const wrap=document.getElementById('sideScroll');
+  let h='';
+  h+=`<div class="side-section">★ 保存済み (${saved.length})</div>`;
+  if(saved.length) saved.forEach(it=> h+=itemHTML(it,true));
+  else h+=`<div class="empty-note">★ を付けると、ここに長期保存されます。</div>`;
+  h+=`<div class="side-section" style="margin-top:6px">最近 (最大10)</div>`;
+  const recOnly = recent.filter(it=>!saved.some(s=>s.id===it.id));
+  if(recent.length) recent.forEach(it=> h+=itemHTML(it,false));
+  else h+=`<div class="empty-note">まだ履歴はありません。英文を生成すると、ここに残ります。</div>`;
+  wrap.innerHTML=h;
+}
+function itemHTML(it,inSaved){
+  const active = currentItem && currentItem.id===it.id ? 'active':'';
+  const on = it.starred ? 'on':'';
+  const d = new Date(it.createdAt);
+  const time = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return `<div class="hist-item ${active}" onclick="loadItem('${it.id}')">
+    <button class="hist-star ${on}" onclick="toggleStar('${it.id}',event)" title="長期保存">★</button>
+    <div class="hist-text">${esc(it.text)}</div>
+    <div class="hist-meta">${time}${it.ai?' · AI':''} · <span class="link" onclick="deleteItem('${it.id}',event)">削除</span></div>
+  </div>`;
+}
+
+/* ===================== Misc UI ===================== */
+function newSession(){
+  currentItem=null;
+  document.getElementById('input').value='';
+  document.getElementById('resultCard').style.display='none';
+  document.getElementById('input').focus();
+  renderSidebar();
+  toggleSidebar(false);
+}
+function clearInput(){ document.getElementById('input').value=''; updateCharCount(); document.getElementById('input').focus(); }
+function updateCharCount(){
+  const t = document.getElementById('input').value.trim();
+  const n = t.length;
+  const words = t ? t.split(/\s+/).length : 0;
+  document.getElementById('ccNum').textContent = n;
+  document.getElementById('ccWords').textContent = words;
+  const over = n > CHAR_LIMIT;
+  document.getElementById('charCount').classList.toggle('warn', over);
+  document.getElementById('overNote').style.display = over ? '' : 'none';
+}
+async function pasteFromClipboard(){
+  try{ const t=await navigator.clipboard.readText(); document.getElementById('input').value=t; updateCharCount(); }
+  catch(e){ alert('クリップボードへのアクセスが許可されていません。手動で貼り付けてください。'); }
+}
+function toggleSidebar(open){
+  const sb=document.getElementById('sidebar'), sc=document.getElementById('scrim');
+  if(open===undefined) open=!sb.classList.contains('open');
+  sb.classList.toggle('open',open); sc.classList.toggle('show',open);
+}
+function openSettings(){
+  document.getElementById('apiKeyInput').value=getKey();
+  document.getElementById('modelSel').value=getModel();
+  document.getElementById('settingsOverlay').classList.add('show');
+}
+function closeSettings(){ document.getElementById('settingsOverlay').classList.remove('show'); }
+function saveSettings(){
+  localStorage.setItem(LS.key, document.getElementById('apiKeyInput').value.trim());
+  localStorage.setItem(LS.model, document.getElementById('modelSel').value);
+  closeSettings(); updateAIPill();
+}
+function clearApiKey(){
+  const stored = getKey();
+  const typed = document.getElementById('apiKeyInput').value.trim();
+  if(!stored && !typed){ alert('保存されているキーはありません。'); return; }
+  if(!confirm('このアプリ（このブラウザ）に保存したAPIキーを削除します。\n\n※サーバー側のキーは無効化されません。完全に止めるにはコンソールでRevokeしてください。\n\n削除しますか？')) return;
+  localStorage.removeItem(LS.key);
+  document.getElementById('apiKeyInput').value='';
+  updateAIPill();
+  if(currentItem && currentTab!=='word') renderTab();   // ロック表示に戻す
+  alert('キーを削除しました。AI機能は無効になり、無料機能のみになります。');
+}
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem(LS.theme, t);
+  const b=document.getElementById('themeBtn');
+  if(b) b.textContent = (t==='light') ? '☀️ ライト' : '🌙 ダーク';
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme')==='light' ? 'light':'dark';
+  applyTheme(cur==='light' ? 'dark' : 'light');
+}
+function showHelp(){ document.getElementById('helpOverlay').classList.add('show'); }
+function closeHelp(){ document.getElementById('helpOverlay').classList.remove('show'); }
+function updateAIPill(){
+  const p=document.getElementById('aiPill');
+  if(getKey()){ p.textContent='AI:有効'; p.classList.add('live'); }
+  else { p.textContent='AI:未設定'; p.classList.remove('live'); }
+  updateUsageStatus();
+}
+function confirmResetUsage(){
+  if(confirm('課金カウントをリセットしますか？（実際の請求には影響しません。表示の累計だけを0に戻します）'))
+    resetUsage();
+}
+
+/* helpers */
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function jsq(s){ return JSON.stringify(String(s)); }
+
+/* ===================== Init ===================== */
+function init(){
+  renderSpeeds();
+  renderSidebar();
+  updateAIPill();
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');  // ボタン表示を同期
+  if(repeatOn) document.getElementById('repeatBtn').classList.add('on');
+  loadVoices();
+  if(speechSynthesis.onvoiceschanged!==undefined) speechSynthesis.onvoiceschanged=loadVoices;
+  document.getElementById('voiceSel').addEventListener('change',e=> localStorage.setItem(LS.voice,e.target.value));
+  // 入力・貼り付けのたびに文字数を更新
+  document.getElementById('input').addEventListener('input', updateCharCount);
+  updateCharCount();
+  // Ctrl/Cmd+Enter to generate
+  document.getElementById('input').addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==='Enter') generate();
+  });
+  loadDict();
+}
+init();
+</script>
+</body>
+</html>
