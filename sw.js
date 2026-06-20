@@ -2,7 +2,7 @@
    アプリ本体（シェル）をキャッシュしてオフライン起動できるようにする。
    発音辞書(CDN)はアプリ側がIndexedDBにキャッシュするため、ここでは扱わない。
    AI機能(api.anthropic.com)はオンライン専用。 */
-const CACHE = "pronounce-v1";   // ← ファイルを更新したら必ず番号を上げる（v2, v3…）
+const CACHE = "pronounce-v2";   // ← ファイルを更新したら必ず番号を上げる（v2, v3…）
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./apple-touch-icon.png"

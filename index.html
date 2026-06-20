@@ -831,16 +831,37 @@ async function copyApiKey(){
   const key=(inp.value.trim() || getKey());
   if(!key){ alert('コピーするキーがありません。'); return; }
   const btn=document.getElementById('copyKeyBtn');
-  try{
-    await navigator.clipboard.writeText(key);
-    const t=btn.textContent; btn.textContent='✅ コピー済み';
-    setTimeout(()=>{ btn.textContent=t; }, 1500);
-  }catch(e){
-    // クリップボードが使えない環境（file:// など）：表示して手動コピーを促す
+  const ok = await copyTextRobust(key, inp);
+  if(ok){
+    btn.textContent='✅ コピー済み';
+    setTimeout(()=>{ btn.textContent='📋 コピー'; }, 1500);
+  }else{
+    // どうしてもコピーできない環境：表示して手動コピーを促す
     inp.type='text'; document.getElementById('showKeyBtn').textContent='🙈 隠す';
     inp.focus(); inp.select();
     alert('自動コピーできませんでした。表示されたキーを長押し（範囲選択）して手動でコピーしてください。');
   }
+}
+// 複数方式でコピーを試みる（HTTPS以外・PWA・古い端末でも動くように）
+async function copyTextRobust(text, inputEl){
+  // 1) Clipboard API（HTTPS / localhost のみ）
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  }catch(e){ /* 失敗したら次の方式へ */ }
+  // 2) execCommand フォールバック（file:// / http / 一部PWA でも動く）
+  try{
+    inputEl.type='text';                                   // 選択できるよう表示
+    document.getElementById('showKeyBtn').textContent='🙈 隠す';
+    inputEl.focus();
+    inputEl.setSelectionRange(0, (inputEl.value||'').length);
+    const ok = document.execCommand && document.execCommand('copy');
+    if(window.getSelection) window.getSelection().removeAllRanges();
+    if(ok) return true;
+  }catch(e){ /* 失敗 */ }
+  return false;
 }
 function closeSettings(){ document.getElementById('settingsOverlay').classList.remove('show'); }
 function saveSettings(){
