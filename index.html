@@ -12,7 +12,7 @@
     document.documentElement.setAttribute('data-theme', _t);
   }catch(e){}
 </script>
-<meta name="theme-color" content="#5b9dff">
+<meta name="theme-color" content="#5fb7c4">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -107,18 +107,40 @@
     border-radius:10px; cursor:pointer; font-size:13px}
   .ghost:hover{border-color:var(--accent)}
 
-  /* speed + voice controls */
+  /* player controls + speed slider */
   .ctl-label{font-size:11px; color:var(--muted); margin-right:2px}
-  .speeds{display:flex; gap:6px; flex-wrap:wrap}
-  .spd{padding:6px 11px; background:var(--chip); border:1px solid var(--line); border-radius:999px;
-    cursor:pointer; font-size:13px; color:var(--txt); min-width:46px; text-align:center}
-  .spd.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700}
   select.voice{background:var(--chip); color:var(--txt); border:1px solid var(--line);
     border-radius:9px; padding:7px 8px; font-size:13px; max-width:200px}
-  .play-row button{font-size:18px; width:42px; height:42px; border-radius:50%; border:1px solid var(--line);
-    background:var(--panel2); color:var(--txt); cursor:pointer}
-  .play-row button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
-  .play-row button.on{background:var(--good); border-color:var(--good); color:#06281d}
+
+  .player-controls{display:flex; justify-content:center; align-items:center; gap:16px; margin:2px 0 16px}
+  .pbtn{width:52px; height:52px; border-radius:50%; border:1.5px solid var(--line);
+    background:transparent; color:var(--txt); cursor:pointer; padding:0;
+    display:flex; align-items:center; justify-content:center; transition:transform .12s, background .15s, border-color .15s}
+  .pbtn svg{width:24px; height:24px; fill:currentColor; display:block}
+  .pbtn:hover{border-color:var(--accent)}
+  .pbtn:active{transform:scale(.93)}
+  /* 再生＝グラデーション塗り（カラー画像に合わせる） */
+  .pbtn.pbtn-primary{border:none; color:#fff;
+    background:linear-gradient(135deg,#37bdb4 0%,#6a6bf0 52%,#e0509e 100%)}
+  .pbtn.pbtn-primary svg{width:26px; height:26px}
+  /* 繰り返し＝通常は白抜き(細アウトライン)、ONでグラデーション */
+  .pbtn.pbtn-repeat.on{border:none; color:#fff;
+    background:linear-gradient(135deg,#37bdb4 0%,#6a6bf0 52%,#e0509e 100%)}
+
+  .speedbar{margin-top:2px}
+  .speedbar-top{display:flex; justify-content:space-between; align-items:baseline}
+  .speed-val{font-size:16px; font-weight:800; color:var(--accent)}
+  #speedRange{width:100%; -webkit-appearance:none; appearance:none; height:6px; border-radius:999px;
+    background:var(--line); outline:none; margin:10px 0 4px}
+  #speedRange::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:22px; height:22px;
+    border-radius:50%; background:var(--accent); border:3px solid var(--panel); cursor:pointer;
+    box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  #speedRange::-moz-range-thumb{width:18px; height:18px; border-radius:50%; background:var(--accent);
+    border:3px solid var(--panel); cursor:pointer}
+  .speed-scale{display:flex; justify-content:space-between; margin-top:2px}
+  .speed-scale span{font-size:10px; color:var(--muted); cursor:pointer; padding:2px 1px}
+  .speed-scale span.on{color:var(--accent); font-weight:700}
+  .speak-status{font-size:12px; color:var(--muted); text-align:center; margin-top:12px}
 
   /* tabs */
   .tabs{display:flex; gap:4px; border-bottom:1px solid var(--line); flex-wrap:wrap}
@@ -246,23 +268,31 @@
 
     <!-- controls -->
     <div class="card">
-      <div class="row between">
-        <div class="row">
-          <span class="ctl-label">速度</span>
-          <div class="speeds" id="speeds"></div>
-        </div>
-        <div class="row">
-          <span class="ctl-label">音声</span>
-          <select class="voice" id="voiceSel"></select>
-        </div>
+      <div class="player-controls">
+        <button class="pbtn pbtn-primary" id="playBtn" title="全文を読み上げ" aria-label="再生" onclick="playAll()">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="pbtn" id="pauseBtn" title="一時停止/再開" aria-label="一時停止/再開" onclick="togglePause()">
+          <svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+        <button class="pbtn" id="stopBtn" title="停止" aria-label="停止" onclick="stopSpeak()">
+          <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+        </button>
+        <button class="pbtn pbtn-repeat" id="repeatBtn" title="繰り返し再生のオン/オフ" aria-label="繰り返し" onclick="toggleRepeat()">
+          <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+        </button>
       </div>
-      <div class="row play-row" style="margin-top:12px; gap:10px; align-items:center">
-        <button class="primary" id="playBtn" title="全文を読み上げ" onclick="playAll()">▶</button>
-        <button id="pauseBtn" title="一時停止/再開" onclick="togglePause()">⏸</button>
-        <button id="stopBtn" title="停止" onclick="stopSpeak()">■</button>
-        <button id="repeatBtn" title="繰り返し再生のオン/オフ" onclick="toggleRepeat()">🔁</button>
-        <span class="status" id="speakStatus">単語をタップ → その単語を発音</span>
+      <div class="speedbar">
+        <div class="speedbar-top"><span class="ctl-label">速度（スライドで調整）</span><span class="speed-val" id="speedVal">1.0×</span></div>
+        <input type="range" id="speedRange" min="0" max="6" step="1" value="3" list="speedTicks" aria-label="読み上げ速度" oninput="setSpeedIndex(this.value)">
+        <datalist id="speedTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option><option value="5"></option><option value="6"></option></datalist>
+        <div class="speed-scale" id="speedScale"></div>
       </div>
+      <div class="row" style="margin-top:14px; align-items:center">
+        <span class="ctl-label">音声</span>
+        <select class="voice" id="voiceSel"></select>
+      </div>
+      <div class="speak-status" id="speakStatus">単語をタップ → その単語を発音</div>
     </div>
 
     <!-- results -->
@@ -710,12 +740,24 @@ function togglePause(){
 }
 function stopSpeak(){ speakToken++; speechSynthesis.cancel(); document.getElementById('speakStatus').textContent='停止'; }
 
-/* ===================== Speed UI ===================== */
-function renderSpeeds(){
-  const el=document.getElementById('speeds');
-  el.innerHTML = SPEEDS.map(s=>`<div class="spd ${s===currentRate?'on':''}" onclick="setSpeed(${s})">${s.toFixed(1)}×</div>`).join('');
+/* ===================== Speed slider（目盛り付き） ===================== */
+function buildSpeedScale(){
+  const el=document.getElementById('speedScale');
+  el.innerHTML = SPEEDS.map((s,i)=>`<span data-i="${i}" onclick="setSpeedIndex(${i})">${s.toFixed(1)}×</span>`).join('');
+  syncSpeedUI();
 }
-function setSpeed(s){ currentRate=s; localStorage.setItem(LS.speed,s); renderSpeeds(); }
+function setSpeedIndex(i){
+  i = Math.max(0, Math.min(SPEEDS.length-1, parseInt(i,10)||0));
+  currentRate = SPEEDS[i];
+  localStorage.setItem(LS.speed, currentRate);
+  syncSpeedUI();
+}
+function syncSpeedUI(){
+  let i = SPEEDS.indexOf(currentRate); if(i<0){ i=3; currentRate=SPEEDS[3]; }
+  const r=document.getElementById('speedRange'); if(r) r.value=i;
+  const v=document.getElementById('speedVal'); if(v) v.textContent=currentRate.toFixed(1)+'×';
+  document.querySelectorAll('#speedScale span').forEach((sp,idx)=> sp.classList.toggle('on', idx===i));
+}
 
 /* ===================== History ===================== */
 function getRecent(){ try{return JSON.parse(localStorage.getItem(LS.recent))||[]}catch(e){return[]} }
@@ -917,7 +959,7 @@ function jsq(s){ return JSON.stringify(String(s)); }
 
 /* ===================== Init ===================== */
 function init(){
-  renderSpeeds();
+  buildSpeedScale();
   renderSidebar();
   updateAIPill();
   applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');  // ボタン表示を同期
