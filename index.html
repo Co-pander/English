@@ -140,7 +140,6 @@
   .speed-scale{display:flex; justify-content:space-between; margin-top:2px}
   .speed-scale span{font-size:10px; color:var(--muted); cursor:pointer; padding:2px 1px}
   .speed-scale span.on{color:var(--accent); font-weight:700}
-  .speak-status{font-size:12px; color:var(--muted); text-align:center; margin-top:12px}
 
   /* tabs */
   .tabs{display:flex; gap:4px; border-bottom:1px solid var(--line); flex-wrap:wrap}
@@ -292,7 +291,6 @@
         <span class="ctl-label">音声</span>
         <select class="voice" id="voiceSel"></select>
       </div>
-      <div class="speak-status" id="speakStatus">単語をタップ → その単語を発音</div>
     </div>
 
     <!-- results -->
@@ -714,9 +712,7 @@ function speak(text){
   const u=new SpeechSynthesisUtterance(text);
   const v=currentVoice(); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='en-US';
   u.rate=currentRate;
-  document.getElementById('speakStatus').textContent='🔊 '+text.slice(0,40);
   u.onend=()=>{
-    document.getElementById('speakStatus').textContent= repeatOn ? '🔁 リピート中…' : '単語をタップ → その単語を発音';
     if(repeatOn && myToken===speakToken){
       setTimeout(()=>{ if(repeatOn && myToken===speakToken) speak(text); }, 400);
     }
@@ -728,7 +724,6 @@ function toggleRepeat(){
   localStorage.setItem(LS.repeat, repeatOn?'1':'0');
   const b=document.getElementById('repeatBtn');
   b.classList.toggle('on', repeatOn);
-  document.getElementById('speakStatus').textContent = repeatOn ? '🔁 リピートON（▶で連続再生）' : '単語をタップ → その単語を発音';
 }
 function playAll(){
   const text = currentItem ? currentItem.text : document.getElementById('input').value;
@@ -738,7 +733,7 @@ function togglePause(){
   if(speechSynthesis.paused) speechSynthesis.resume();
   else if(speechSynthesis.speaking) speechSynthesis.pause();
 }
-function stopSpeak(){ speakToken++; speechSynthesis.cancel(); document.getElementById('speakStatus').textContent='停止'; }
+function stopSpeak(){ speakToken++; speechSynthesis.cancel(); }
 
 /* ===================== Speed slider（目盛り付き） ===================== */
 function buildSpeedScale(){
