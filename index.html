@@ -617,7 +617,7 @@ async function runAI(item){
   item.aiLoading = true;
   if(currentItem && currentItem.id===item.id && currentTab!=='word') renderTab(); // show spinner
   const sys ="You are an expert English phonetician and language coach for Japanese learners. Output ONLY valid minified JSON, no markdown.";
-  const prompt = `Analyze this English text for a Japanese learner:\n"""${item.text}"""\n\nReturn JSON with EXACTLY these keys:\n{\n"chunks":[{"text":"<sense group as written>","ipa":"<IPA of the chunk, American English, with stress marks>","note":"<日本語で、このチャンクの役割・意味・発音の注意点>"}],\n"sentenceIpa":"<IPA of the WHOLE text as naturally connected speech, showing liaison/linking and reduction (weak forms, elision, flapping), American English, with stress and ‖ for pauses>",\n"sentenceNotes":"<日本語で、起きているリエゾン/リダクションの具体例を2〜4点>",\n"explanation":"<日本語で、直訳ではなく『話し手の意図・含意・言外のニュアンス・表現上のポイント』を3〜6行で>"\n}\nUse proper IPA symbols. Keep Japanese concise.`;
+  const prompt = `Analyze this English text for a Japanese learner:\n"""${item.text}"""\n\nReturn JSON with EXACTLY these keys:\n{\n"chunks":[{"text":"<sense group as written>","ipa":"<IPA of the chunk read carefully, American English, with stress marks>","note":"<日本語で簡潔に：このチャンクの役割・意味・発音の注意点>"}],\n"sentenceIpa":"<the WHOLE text in CONNECTED-SPEECH IPA (American English). It MUST look clearly different from reading words in isolation: mark linking with ‿ between words that link, show reductions explicitly — weak forms (to→tə, and→ən, of→əv, you→jə), elision/dropped sounds, t/d flapping (→ɾ), contractions. Use ˈ for stress and ‖ for pauses>",\n"sentenceNotes":"<日本語で簡潔に、起きているリエゾン/リダクションの具体例を2〜4点（どの語とどの語が繋がる・どこが弱くなる/落ちる）>",\n"explanation":"<日本語で簡潔に（3〜5行）、直訳ではなく話し手の意図・含意・言外のニュアンス・表現上のポイント>"\n}\nUse proper IPA symbols. Be concise to keep the response compact.`;
   try{
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -628,7 +628,7 @@ async function runAI(item){
         'anthropic-dangerous-direct-browser-access':'true'
       },
       body: JSON.stringify({
-        model:getModel(), max_tokens:1500,
+        model:getModel(), max_tokens:4000,
         system:sys,
         messages:[{role:'user',content:prompt}]
       })
@@ -638,7 +638,15 @@ async function runAI(item){
     recordUsage(data.usage, getModel());   // 実際のトークン消費から課金を加算
     let txt = (data.content&&data.content[0]&&data.content[0].text)||'';
     const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
-    const parsed = JSON.parse(txt.slice(s,e+1));
+    let parsed;
+    try{
+      const raw = txt.slice(s, e+1).replace(/,(\s*[}\]])/g,'$1');  // 末尾カンマを除去
+      parsed = JSON.parse(raw);
+    }catch(perr){
+      if(data.stop_reason==='max_tokens')
+        throw new Error('文章が長く、AIの生成が途中で切れました。文章を短く区切って再生成してください。');
+      throw new Error('AIの出力を読み取れませんでした（JSON解析）。もう一度「再試行」してください。');
+    }
     item.ai = parsed;
     item.aiLoading = false;
     if(currentItem && currentItem.id===item.id) renderTab();
